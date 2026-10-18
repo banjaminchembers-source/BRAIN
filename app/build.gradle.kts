@@ -15,3 +15,7 @@ android {
         versionName = "0.1.0"
     }
 }
+
+dependencies {
+    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
+}
