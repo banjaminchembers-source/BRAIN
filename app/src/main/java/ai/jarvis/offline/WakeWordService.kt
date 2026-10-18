@@ -95,7 +95,7 @@ class WakeWordService : Service() {
                             else -> "Ошибка распознавания: $error. Повторяю запуск"
                         }
                         updateNotification(message)
-                        if (running) restartSoon()
+                        if (running && !speaking) restartSoon()
                     }
                     override fun onResults(results: android.os.Bundle?) {
                         restarting = false
@@ -137,7 +137,7 @@ class WakeWordService : Service() {
         val command = phrase.substring(wake.second + wake.first.length).trim()
         if (command.isBlank()) {
             updateNotification("Слушаю, сэр!")
-            speakWakeResponse()
+            speakOffline("Слушаю, сэр!")
             return
         }
         executeCommand(command)
@@ -145,17 +145,25 @@ class WakeWordService : Service() {
 
     private fun executeCommand(command: String) {
         when {
-            command.contains("камер") || command.contains("фото") || command.contains("сфот") ->
+            command.contains("камер") || command.contains("фото") || command.contains("сфот") -> {
+                speakOffline("Открываю камеру.")
                 openApp(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
-            command.contains("музык") || command.contains("песн") || command.contains("трек") || command.contains("плеер") ->
+            }
+            command.contains("музык") || command.contains("песн") || command.contains("трек") || command.contains("плеер") -> {
+                speakOffline("Открываю музыкальный плеер.")
                 openApp(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC))
+            }
             command.contains("позвони") || command.contains("набери") || command.contains("вызов") || command.contains("телефон") -> {
                 updateNotification("Открыл набор номера. Проверь номер и подтверди вызов")
+                speakOffline("Открываю набор номера. Проверь номер и подтверди вызов.")
                 openApp(Intent(Intent.ACTION_DIAL))
             }
             command.contains("стоп") || command.contains("останови") ->
                 updateNotification("Для остановки нажми «Выключить» в уведомлении")
-            else -> updateNotification("Услышал: $command. Пока поддерживаются камера, музыка и набор номера")
+            else -> {
+                updateNotification("Услышал: $command. Пока поддерживаются камера, музыка и набор номера")
+                speakOffline("Я услышал команду, но пока не умею её выполнять. Сейчас доступны камера, музыка и набор номера.")
+            }
         }
     }
 
@@ -169,13 +177,13 @@ class WakeWordService : Service() {
         }
     }
 
-    private fun speakWakeResponse() {
+    private fun speakOffline(text: String) {
         if (speaking) return
         speaking = true
         Thread {
             try {
                 if (offlineTts == null) initializeOfflineVoice()
-                val audio = offlineTts!!.generate(text = "Слушаю, сэр!", sid = 0, speed = 1.0f)
+                val audio = offlineTts!!.generate(text = text, sid = 0, speed = 1.0f)
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
