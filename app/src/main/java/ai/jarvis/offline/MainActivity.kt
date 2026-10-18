@@ -230,6 +230,7 @@ class MainActivity : Activity() {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.CAMERA,
             Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.SEND_SMS,
             Manifest.permission.READ_SMS,
