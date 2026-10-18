@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var listenButton: Button
     @Volatile private var voiceReady = false
+    private var waitingForOverlayPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -254,6 +255,7 @@ class MainActivity : Activity() {
     private fun enableFloatingVoiceButton() {
         if (!Settings.canDrawOverlays(this)) {
             status.text = "Разреши Джарвису отображаться поверх других приложений."
+            waitingForOverlayPermission = true
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             runCatching { startActivity(intent) }
             return
