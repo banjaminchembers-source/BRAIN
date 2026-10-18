@@ -1,4 +1,4 @@
-name: Android APK
+name: Android APK and offline voice bundle
 
 on:
   push:
@@ -32,3 +32,33 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Download and package Russian male TTS model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p voice-package
+          curl --fail --location --retry 3 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-dmitri-medium.tar.bz2 \
+            --output /tmp/russian-voice.tar.bz2
+          tar -xjf /tmp/russian-voice.tar.bz2 -C voice-package
+          test -n "$(find voice-package -name '*.onnx' -type f -print -quit)"
+          test -n "$(find voice-package -name 'tokens.txt' -type f -print -quit)"
+          cat > voice-package/INTEGRATION.txt <<'EOF'
+          Jarvis Offline: Russian male TTS voice bundle
+          Model: Piper ru_RU-dmitri-medium, converted for sherpa-onnx
+          Runtime: sherpa-onnx TTS (Android native/JNI runtime required)
+          This bundle contains model data, not a standalone executable and not the runtime.
+          It generates speech locally after the app integrates the sherpa-onnx Android API.
+          Check upstream model and runtime licenses before redistribution.
+          Model source: https://huggingface.co/rhasspy/piper-voices/tree/main/ru/ru_RU/dmitri/medium
+          Converted bundle: https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models
+          EOF
+          cd voice-package
+          zip -qr ../jarvis-russian-male-voice.zip .
+      - name: Upload separate voice model bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-russian-male-voice
+          path: jarvis-russian-male-voice.zip
+          if-no-files-found: error
+          retention-days: 30
