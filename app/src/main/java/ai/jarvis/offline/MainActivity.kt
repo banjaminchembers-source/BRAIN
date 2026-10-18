@@ -226,7 +226,7 @@ class MainActivity : Activity() {
                     "Уведомления Jarvis",
                     "Оптимизация батареи"
                 )
-                android.app.AlertDialog.Builder(this)
+                android.app.AlertDialog.Builder(this@MainActivity)
                     .setTitle("Настройки Jarvis")
                     .setItems(items) { _, which ->
                         val intent = when (which) {
