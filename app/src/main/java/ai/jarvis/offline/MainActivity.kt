@@ -15,6 +15,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -33,6 +34,7 @@ class MainActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private lateinit var status: TextView
     private lateinit var listenButton: Button
+    private var voiceOrb: View? = null
     @Volatile private var voiceReady = false
     private var waitingForOverlayPermission = false
 
@@ -57,7 +59,7 @@ class MainActivity : Activity() {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) { status.text = "Слушаю…" }
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onRmsChanged(rmsdB: Float) { setOrbLevel(((rmsdB + 2f) / 14f).coerceIn(0f, 1f) * 0.10f) }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() { status.text = "Обрабатываю речь…" }
                     override fun onError(error: Int) {
@@ -70,6 +72,7 @@ class MainActivity : Activity() {
                             else -> "Ошибка распознавания (код $error). Проверь разрешение на микрофон и службу распознавания Android."
                         }
                         listenButton.isEnabled = true
+                        setOrbLevel(0f)
                     }
                     override fun onResults(results: Bundle?) {
                         listenButton.isEnabled = true
@@ -191,15 +194,38 @@ class MainActivity : Activity() {
             setTextColor(muted)
         })
         header.addView(brandText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val ready = TextView(this).apply {
-            text = "●  READY"
-            textSize = 10f
-            letterSpacing = 0.06f
-            setTextColor(lime)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = roundedPanel(0xFF10170B.toInt(), 0xFF354D21.toInt(), 24)
+        val gear = Button(this).apply {
+            text = "⚙"
+            textSize = 25f
+            gravity = Gravity.CENTER
+            isAllCaps = false
+            contentDescription = "Системные настройки Jarvis"
+            setTextColor(0xFFCFFF8B.toInt())
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF29391A.toInt(), 0xFF10170B.toInt(), 0xFF080C07.toInt())
+            ).apply {
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xFF587C30.toInt())
+            }
+            elevation = dp(5).toFloat()
+            stateListAnimator = null
+            setOnClickListener {
+                runCatching {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                }.onFailure { status.text = "Не удалось открыть системные настройки." }
+            }
         }
-        header.addView(ready)
+        header.addView(gear, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) })
+        val redIndicator = TextView(this).apply {
+            text = "●"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFF3B45.toInt())
+            setShadowLayer(dp(6).toFloat(), 0f, 0f, 0xFFFF2635.toInt())
+            contentDescription = "Индикатор"
+        }
+        header.addView(redIndicator, LinearLayout.LayoutParams(dp(18), dp(24)).apply { marginStart = dp(3) })
         content.addView(header, matchWidth())
 
         val topLine = TextView(this).apply {
@@ -251,6 +277,7 @@ class MainActivity : Activity() {
         core.addView(orbCaption)
         middle.addView(core, LinearLayout.LayoutParams(dp(142), dp(142)).apply { gravity = Gravity.CENTER })
         outer.addView(middle, LinearLayout.LayoutParams(dp(166), dp(166)).apply { gravity = Gravity.CENTER })
+        voiceOrb = outer
         orbWrap.addView(outer, LinearLayout.LayoutParams(dp(190), dp(190)).apply { gravity = Gravity.CENTER })
         content.addView(orbWrap, matchWidth())
 
@@ -323,6 +350,15 @@ class MainActivity : Activity() {
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
+    }
+
+    private fun setOrbLevel(level: Float) {
+        runOnUiThread {
+            val amount = level.coerceIn(0f, 0.16f)
+            voiceOrb?.animate()?.cancel()
+            voiceOrb?.animate()?.scaleX(1f + amount)?.scaleY(1f + amount)
+                ?.setDuration(85L)?.start()
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -449,6 +485,7 @@ class MainActivity : Activity() {
             status.text = "Нет движка распознавания речи."
             return
         }
+        setOrbLevel(0.035f)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
@@ -520,11 +557,19 @@ class MainActivity : Activity() {
                 track.play()
                 var offset = 0
                 while (offset < audio.samples.size) {
-                    val count = minOf(4096, audio.samples.size - offset)
+                    val count = minOf(1024, audio.samples.size - offset)
+                    var sumSquares = 0.0
+                    for (i in offset until minOf(offset + count, audio.samples.size)) {
+                        val sample = audio.samples[i].toDouble()
+                        sumSquares += sample * sample
+                    }
+                    val rms = kotlin.math.sqrt(sumSquares / count.coerceAtLeast(1)).toFloat()
+                    runOnUiThread { setOrbLevel((rms * 0.55f).coerceIn(0f, 0.14f)) }
                     track.write(audio.samples, offset, count, AudioTrack.WRITE_BLOCKING)
                     offset += count
                 }
                 track.stop()
+                runOnUiThread { setOrbLevel(0f) }
                 track.release()
             }.onFailure { error ->
                 runOnUiThread { status.text = "Ошибка синтеза голоса: ${error.message}" }
