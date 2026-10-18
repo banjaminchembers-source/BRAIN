@@ -130,106 +130,246 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        window.statusBarColor = 0xFF050509.toInt()
-        window.navigationBarColor = 0xFF050509.toInt()
+        val black = 0xFF050705.toInt()
+        val lime = 0xFFB8FF43.toInt()
+        val softLime = 0xFFDFFF9B.toInt()
+        val muted = 0xFF879777.toInt()
+        window.statusBarColor = black
+        window.navigationBarColor = black
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(24, 26, 24, 24)
-            setBackgroundColor(0xFF050509.toInt())
+            setPadding(dp(22), dp(12), dp(22), dp(16))
+            setBackgroundColor(black)
         }
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            overScrollMode = ScrollView.OVER_SCROLL_NEVER
+        }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(0, 16, 0, 16)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(10), 0, dp(18))
         }
-        val eyebrow = TextView(this).apply {
-            text = "PERSONAL AI  /  OFFLINE VOICE"
-            textSize = 11f
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(14))
+        }
+        val logoMark = TextView(this).apply {
+            text = "J"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.BOLD)
+            setTextColor(softLime)
+            background = glossyCircle(0xFF18250D.toInt(), lime, 0xFF38571B.toInt())
+            elevation = dp(8).toFloat()
+        }
+        header.addView(logoMark, LinearLayout.LayoutParams(dp(48), dp(48)))
+        val brandText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        brandText.addView(TextView(this).apply {
+            text = "JARVIS"
+            textSize = 21f
             letterSpacing = 0.18f
-            setTextColor(0xFF00F5FF.toInt())
-            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+            setTextColor(softLime)
+        })
+        brandText.addView(TextView(this).apply {
+            text = "VOICE INTELLIGENCE"
+            textSize = 9f
+            letterSpacing = 0.19f
+            setTextColor(muted)
+        })
+        header.addView(brandText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val ready = TextView(this).apply {
+            text = "●  READY"
+            textSize = 10f
+            letterSpacing = 0.06f
+            setTextColor(lime)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = roundedPanel(0xFF10170B.toInt(), 0xFF354D21.toInt(), 24)
         }
-        val title = TextView(this).apply {
-            text = "J A R V I S"
-            textSize = 32f
+        header.addView(ready)
+        content.addView(header, matchWidth())
+
+        val topLine = TextView(this).apply {
+            text = "YOUR PERSONAL VOICE ASSISTANT"
+            textSize = 10f
+            letterSpacing = 0.22f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF77915B.toInt())
+            setPadding(0, dp(10), 0, dp(4))
+        }
+        content.addView(topLine, matchWidth())
+
+        val orbWrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(16))
+        }
+        val outer = TextView(this).apply {
+            gravity = Gravity.CENTER
+            background = glossyCircle(0xFF0C1308.toInt(), 0xFF4B7028.toInt(), 0xFF17240D.toInt())
+            elevation = dp(10).toFloat()
+        }
+        val middle = TextView(this).apply {
+            gravity = Gravity.CENTER
+            background = glossyCircle(0xFF18260C.toInt(), 0xFF9FE83B.toInt(), 0xFF263D12.toInt())
+        }
+        val core = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = glossyCircle(0xFF0A0E08.toInt(), 0xFFD5FF88.toInt(), 0xFF1A2B0D.toInt())
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        val glyph = TextView(this).apply {
+            text = "J"
+            textSize = 64f
+            gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
-            setTextColor(0xFF00F5FF.toInt())
-            gravity = Gravity.CENTER
-            setShadowLayer(18f, 0f, 0f, 0xFF00D9FF.toInt())
-            setPadding(0, 12, 0, 4)
+            setTextColor(softLime)
+            setShadowLayer(dp(18).toFloat(), 0f, 0f, 0xFF8DE52A.toInt())
         }
-        val subtitle = TextView(this).apply {
-            text = "ГОЛОСОВОЙ ИНТЕРФЕЙС"
-            textSize = 11f
+        val orbCaption = TextView(this).apply {
+            text = "VOICE CORE"
+            textSize = 8f
             letterSpacing = 0.24f
-            setTextColor(0xFFB44CFF.toInt())
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 22)
+            setTextColor(0xFF9CC66A.toInt())
         }
+        core.addView(glyph, LinearLayout.LayoutParams(dp(112), dp(88)))
+        core.addView(orbCaption)
+        middle.addView(core, LinearLayout.LayoutParams(dp(142), dp(142)).apply { gravity = Gravity.CENTER })
+        outer.addView(middle, LinearLayout.LayoutParams(dp(166), dp(166)).apply { gravity = Gravity.CENTER })
+        orbWrap.addView(outer, LinearLayout.LayoutParams(dp(190), dp(190)).apply { gravity = Gravity.CENTER })
+        content.addView(orbWrap, matchWidth())
+
+        val headline = TextView(this).apply {
+            text = "Я тебя слушаю"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setTextColor(0xFFE7F6D5.toInt())
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        content.addView(headline, matchWidth())
+        val subline = TextView(this).apply {
+            text = "Нажми на диалог и говори естественно"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(muted)
+            setPadding(dp(8), 0, dp(8), dp(18))
+        }
+        content.addView(subline, matchWidth())
+
         status = TextView(this).apply {
-            text = "Подготавливаю голосовую систему…"
-            textSize = 15f
-            setTextColor(0xFFD7D9E8.toInt())
+            text = "Подготавливаю офлайн-голос…"
+            textSize = 13f
             gravity = Gravity.CENTER
-            setPadding(16, 20, 16, 20)
-            background = roundedPanel(0xFF0D101B.toInt(), 0xFF263A58.toInt(), 18)
+            setTextColor(0xFFD8E9C8.toInt())
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = roundedPanel(0xFF0C1109.toInt(), 0xFF293D1A.toInt(), 18)
         }
-        listenButton = neonButton("◉   ГОЛОСОВОЙ ДИАЛОГ", 0xFF00F5FF.toInt(), 0xFF061116.toInt()).apply {
+        content.addView(status, matchWidth())
+
+        listenButton = neonButton("●   ГОЛОСОВОЙ ДИАЛОГ", true).apply {
             setOnClickListener { startListening() }
         }
-        val backgroundButton = neonButton("⌁   ФОНОВОЕ ПРОСЛУШИВАНИЕ", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
+        content.addView(listenButton, matchWidth())
+
+        val backgroundButton = neonButton("◌   ФОНОВОЕ ПРОСЛУШИВАНИЕ", false).apply {
             setOnClickListener { startWakeListening() }
         }
-        val floating = neonButton("⬡   ПЛАВАЮЩАЯ КНОПКА ПОВЕРХ ПРИЛОЖЕНИЙ", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
+        content.addView(backgroundButton, matchWidth())
+
+        val floating = neonButton("⬡   ПЛАВАЮЩАЯ КНОПКА", false).apply {
             setOnClickListener { enableFloatingVoiceButton() }
         }
-        val camera = neonButton("КАМЕРА", 0xFF00F5FF.toInt(), 0xFF061116.toInt()).apply {
+        content.addView(floating, matchWidth())
+
+        val quickActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        val camera = neonButton("КАМЕРА", false).apply {
             setOnClickListener { launchCamera() }
         }
-        val music = neonButton("МУЗЫКА", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
+        val music = neonButton("МУЗЫКА", false).apply {
             setOnClickListener { launchMusic() }
         }
+        quickActions.addView(camera, LinearLayout.LayoutParams(0, dp(54), 1f).apply { marginEnd = dp(6) })
+        quickActions.addView(music, LinearLayout.LayoutParams(0, dp(54), 1f).apply { marginStart = dp(6) })
+        content.addView(quickActions, matchWidth())
+
         val hint = TextView(this).apply {
-            text = "Скажи «Джарвис» и команду. Для фонового режима приложение покажет постоянное уведомление."
-            textSize = 12f
-            setTextColor(0xFF858AA4.toInt())
+            text = "Скажи «Джарвис» для активации в фоновом режиме"
+            textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(12, 18, 12, 6)
+            setTextColor(0xFF66745A.toInt())
+            setPadding(dp(12), dp(16), dp(12), dp(4))
         }
-        content.addView(eyebrow, matchWidth())
-        content.addView(title, matchWidth())
-        content.addView(subtitle, matchWidth())
-        content.addView(status, matchWidth())
-        content.addView(listenButton, matchWidth())
-        content.addView(backgroundButton, matchWidth())
-        content.addView(floating, matchWidth())
-        content.addView(camera, matchWidth())
-        content.addView(music, matchWidth())
         content.addView(hint, matchWidth())
+
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
     }
 
-    private fun roundedPanel(color: Int, stroke: Int, radiusDp: Int) =
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun glossyCircle(base: Int, edge: Int, shade: Int) =
+        android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            intArrayOf(edge, base, shade, 0xFF070A06.toInt())
+        ).apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setStroke(dp(1), edge)
+        }
+
+        private fun roundedPanel(color: Int, stroke: Int, radiusDp: Int) =
         android.graphics.drawable.GradientDrawable().apply {
             setColor(color)
             cornerRadius = radiusDp * resources.displayMetrics.density
             setStroke((1.2f * resources.displayMetrics.density).toInt(), stroke)
         }
 
-    private fun neonButton(label: String, neon: Int, fill: Int) = Button(this).apply {
+    private fun neonButton(label: String, primary: Boolean) = Button(this).apply {
         text = label
-        textSize = 13f
-        letterSpacing = 0.04f
+        textSize = if (primary) 14f else 11f
+        letterSpacing = if (primary) 0.06f else 0.025f
         isAllCaps = false
-        setTextColor(neon)
-        background = roundedPanel(fill, neon, 48)
-        elevation = 0f
-        setPadding(18, 18, 18, 18)
-        minHeight = (58 * resources.displayMetrics.density).toInt()
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+        setTextColor(if (primary) 0xFF101707.toInt() else 0xFFCFFF8B.toInt())
+        background = if (primary) {
+            android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFFE0FF9A.toInt(), 0xFFB8FF43.toInt(), 0xFF78B922.toInt())
+            ).apply {
+                cornerRadius = dp(32).toFloat()
+                setStroke(dp(1), 0xFFDFFF9B.toInt())
+            }
+        } else {
+            android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF1B2810.toInt(), 0xFF10170B.toInt(), 0xFF080C07.toInt())
+            ).apply {
+                cornerRadius = dp(28).toFloat()
+                setStroke(dp(1), 0xFF557A2D.toInt())
+            }
+        }
+        elevation = if (primary) dp(7).toFloat() else dp(2).toFloat()
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        minHeight = dp(if (primary) 62 else 54)
         stateListAnimator = null
     }
 
