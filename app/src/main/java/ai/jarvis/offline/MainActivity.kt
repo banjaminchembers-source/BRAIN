@@ -61,7 +61,14 @@ class MainActivity : Activity() {
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() { status.text = "Обрабатываю речь…" }
                     override fun onError(error: Int) {
-                        status.text = "Распознавание недоступно (код $error). Для офлайн-режима установи локальный русский пакет распознавания Android."
+                        status.text = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Ошибка микрофона. Проверь разрешение и отключи Bluetooth-гарнитуру для проверки."
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Нет разрешения на микрофон. Разреши его в настройках Android."
+                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Нет связи с распознаванием речи. Проверь интернет или установи русский офлайн-пакет распознавания."
+                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Не расслышал речь. Нажми кнопку и говори сразу после сигнала."
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Распознавание занято. Подожди секунду и повтори."
+                            else -> "Ошибка распознавания (код $error). Проверь разрешение на микрофон и службу распознавания Android."
+                        }
                         listenButton.isEnabled = true
                     }
                     override fun onResults(results: Bundle?) {
@@ -306,7 +313,7 @@ class MainActivity : Activity() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
@@ -322,9 +329,9 @@ class MainActivity : Activity() {
     private fun handleCommand(raw: String) {
         val phrase = raw.lowercase(Locale("ru", "RU"))
         when {
-            phrase.contains("камер") || phrase.contains("фото") -> launchCamera()
-            phrase.contains("музык") || phrase.contains("песн") -> launchMusic()
-            phrase.contains("позвони") || phrase.contains("набери") || phrase.contains("вызов") -> {
+            phrase.contains("камер") || phrase.contains("фото") || phrase.contains("сфот") -> launchCamera()
+            phrase.contains("музык") || phrase.contains("песн") || phrase.contains("трек") || phrase.contains("медиаплеер") -> launchMusic()
+            phrase.contains("позвони") || phrase.contains("набери") || phrase.contains("вызов") || phrase.contains("телефон") -> {
                 speak("Открываю набор номера. Проверь номер и подтверди вызов.")
                 startActivity(Intent(Intent.ACTION_DIAL))
             }
