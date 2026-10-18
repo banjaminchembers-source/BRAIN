@@ -9,6 +9,8 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.Settings
+import android.net.Uri
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -48,9 +50,7 @@ class MainActivity : Activity() {
                 }
         }.start()
 
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 42)
-        }
+        requestAllRuntimePermissions()
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                 setRecognitionListener(object : RecognitionListener {
@@ -174,6 +174,9 @@ class MainActivity : Activity() {
         val backgroundButton = neonButton("⌁   ФОНОВОЕ ПРОСЛУШИВАНИЕ", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
             setOnClickListener { startWakeListening() }
         }
+        val floating = neonButton("⬡   ПЛАВАЮЩАЯ КНОПКА ПОВЕРХ ПРИЛОЖЕНИЙ", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
+            setOnClickListener { enableFloatingVoiceButton() }
+        }
         val camera = neonButton("КАМЕРА", 0xFF00F5FF.toInt(), 0xFF061116.toInt()).apply {
             setOnClickListener { launchCamera() }
         }
@@ -193,6 +196,7 @@ class MainActivity : Activity() {
         content.addView(status, matchWidth())
         content.addView(listenButton, matchWidth())
         content.addView(backgroundButton, matchWidth())
+        content.addView(floating, matchWidth())
         content.addView(camera, matchWidth())
         content.addView(music, matchWidth())
         content.addView(hint, matchWidth())
@@ -219,6 +223,47 @@ class MainActivity : Activity() {
         setPadding(18, 18, 18, 18)
         minHeight = (58 * resources.displayMetrics.density).toInt()
         stateListAnimator = null
+    }
+
+    private fun requestAllRuntimePermissions() {
+        val wanted = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            wanted += Manifest.permission.READ_MEDIA_AUDIO
+            wanted += Manifest.permission.READ_MEDIA_IMAGES
+            wanted += Manifest.permission.READ_MEDIA_VIDEO
+            wanted += Manifest.permission.POST_NOTIFICATIONS
+        } else {
+            wanted += Manifest.permission.READ_EXTERNAL_STORAGE
+            if (android.os.Build.VERSION.SDK_INT <= 28) wanted += Manifest.permission.WRITE_EXTERNAL_STORAGE
+        }
+        val missing = wanted.distinct().filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 420)
+    }
+
+    private fun enableFloatingVoiceButton() {
+        if (!Settings.canDrawOverlays(this)) {
+            status.text = "Разреши Джарвису отображаться поверх других приложений."
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            runCatching { startActivity(intent) }
+            return
+        }
+        val serviceIntent = Intent(this, FloatingVoiceService::class.java)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent) else startService(serviceIntent)
+            status.text = "Плавающая кнопка включена. Она останется поверх других приложений."
+        } catch (e: Exception) {
+            status.text = "Не удалось включить плавающую кнопку: ${e.message}"
+        }
     }
 
     private fun startWakeListening() {
