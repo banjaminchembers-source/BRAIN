@@ -75,6 +75,15 @@ class WakeWordService : Service() {
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
                         restarting = false
+                        val message = when (error) {
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Нет доступа к микрофону. Разреши его в настройках Android"
+                            SpeechRecognizer.ERROR_AUDIO -> "Ошибка аудио. Проверь микрофон и Bluetooth-гарнитуру"
+                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Распознавание не подключилось. Проверь интернет или русский офлайн-пакет"
+                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Не расслышал. Скажи команду чётко и ближе к микрофону"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Распознавание занято, повторяю запуск"
+                            else -> "Ошибка распознавания: $error. Повторяю запуск"
+                        }
+                        updateNotification(message)
                         if (running) restartSoon()
                     }
                     override fun onResults(results: android.os.Bundle?) {
