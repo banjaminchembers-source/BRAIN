@@ -5,6 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -14,6 +17,12 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import java.util.Locale
+import java.io.File
+import java.io.FileOutputStream
+import com.k2fsa.sherpa.onnx.OfflineTts
+import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 
 /**
  * User-started microphone foreground service. Uses Android's installed speech
@@ -25,6 +34,8 @@ class WakeWordService : Service() {
     @Volatile private var running = false
     @Volatile private var directCommandMode = false
     private var restarting = false
+    @Volatile private var speaking = false
+    @Volatile private var offlineTts: OfflineTts? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -125,7 +136,8 @@ class WakeWordService : Service() {
             ?: return
         val command = phrase.substring(wake.second + wake.first.length).trim()
         if (command.isBlank()) {
-            updateNotification("Слово услышано. Скажи команду после слова «Джарвис»")
+            updateNotification("Слушаю, сэр!")
+            speakWakeResponse()
             return
         }
         executeCommand(command)
@@ -157,10 +169,88 @@ class WakeWordService : Service() {
         }
     }
 
+    private fun speakWakeResponse() {
+        if (speaking) return
+        speaking = true
+        Thread {
+            try {
+                if (offlineTts == null) initializeOfflineVoice()
+                val audio = offlineTts!!.generate(text = "Слушаю, сэр!", sid = 0, speed = 1.0f)
+                val track = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(audio.sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(16384)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+                track.play()
+                var offset = 0
+                while (offset < audio.samples.size) {
+                    val count = minOf(4096, audio.samples.size - offset)
+                    track.write(audio.samples, offset, count, AudioTrack.WRITE_BLOCKING)
+                    offset += count
+                }
+                track.stop()
+                track.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not speak wake response", e)
+                updateNotification("Услышал «Джарвис», но не удалось произнести ответ")
+            } finally {
+                speaking = false
+                if (running) android.os.Handler(mainLooper).postDelayed({ if (running) startRecognizer() }, 350)
+            }
+        }.start()
+    }
+
+    private fun initializeOfflineVoice() {
+        val modelFolder = "vits-piper-ru_RU-dmitri-medium"
+        val destination = File(filesDir, modelFolder)
+        val model = File(destination, "ru_RU-dmitri-medium.onnx")
+        if (!model.exists()) copyAssetTree(modelFolder, destination)
+        check(model.exists()) { "Не найдена офлайн-модель голоса" }
+        val tokens = File(destination, "tokens.txt")
+        val espeakData = File(destination, "espeak-ng-data")
+        check(tokens.exists() && espeakData.isDirectory) { "Не найдены файлы офлайн-голоса" }
+        val config = OfflineTtsConfig(
+            model = OfflineTtsModelConfig(
+                vits = OfflineTtsVitsModelConfig(
+                    model = model.absolutePath,
+                    tokens = tokens.absolutePath,
+                    dataDir = espeakData.absolutePath
+                ),
+                numThreads = 2
+            )
+        )
+        offlineTts = OfflineTts(config = config)
+    }
+
+    private fun copyAssetTree(assetPath: String, destination: File) {
+        val children = assets.list(assetPath) ?: emptyArray()
+        if (children.isEmpty()) {
+            destination.parentFile?.mkdirs()
+            assets.open(assetPath).use { input ->
+                FileOutputStream(destination).use { output -> input.copyTo(output) }
+            }
+        } else {
+            destination.mkdirs()
+            children.forEach { child -> copyAssetTree("$assetPath/$child", File(destination, child)) }
+        }
+    }
+
     private fun restartSoon() {
         android.os.Handler(mainLooper).postDelayed({
             restarting = false
-            if (running) startRecognizer()
+            if (running && !speaking) startRecognizer()
         }, 900)
     }
 
@@ -204,6 +294,8 @@ class WakeWordService : Service() {
 
     override fun onDestroy() {
         stopListening()
+        try { offlineTts?.release() } catch (_: Exception) {}
+        offlineTts = null
         super.onDestroy()
     }
 
