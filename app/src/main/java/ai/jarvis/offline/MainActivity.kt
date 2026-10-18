@@ -4,35 +4,53 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.k2fsa.sherpa.onnx.OfflineTts
+import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 
-class MainActivity : Activity(), TextToSpeech.OnInitListener {
-    private var tts: TextToSpeech? = null
+class MainActivity : Activity() {
+    private var offlineTts: OfflineTts? = null
     private var recognizer: SpeechRecognizer? = null
     private lateinit var status: TextView
     private lateinit var listenButton: Button
-    private var ttsReady = false
+    @Volatile private var voiceReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tts = TextToSpeech(this, this)
         buildUi()
+        status.text = "Подготавливаю офлайн-голос…"
+        Thread {
+            runCatching { initializeOfflineVoice() }
+                .onSuccess {
+                    voiceReady = true
+                    runOnUiThread { status.text = "Офлайн-голос Димитри готов. Интернет не требуется." }
+                }
+                .onFailure { error ->
+                    runOnUiThread { status.text = "Не удалось загрузить голосовую модель: ${error.message}" }
+                }
+        }.start()
+
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 42)
         }
-        status.text = "Джарвис готов. Пока используется системный TTS."
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                 setRecognitionListener(object : RecognitionListener {
@@ -42,7 +60,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() { status.text = "Обрабатываю речь…" }
                     override fun onError(error: Int) {
-                        status.text = "Офлайн-распознавание недоступно (код $error). Проверь локальный языковой пакет Android."
+                        status.text = "Распознавание недоступно (код $error). Для офлайн-режима установи локальный русский пакет распознавания Android."
                         listenButton.isEnabled = true
                     }
                     override fun onResults(results: Bundle?) {
@@ -61,6 +79,45 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         } else {
             status.text = "На устройстве нет движка распознавания речи."
             listenButton.isEnabled = false
+        }
+    }
+
+    private fun initializeOfflineVoice() {
+        val modelFolder = "vits-piper-ru_RU-dmitri-medium"
+        val destination = File(filesDir, modelFolder)
+        val model = File(destination, "ru_RU-dmitri-medium.onnx")
+        if (!model.exists()) {
+            copyAssetTree(modelFolder, destination)
+        }
+        check(model.exists()) { "Файл модели не найден: ${model.absolutePath}" }
+        val tokens = File(destination, "tokens.txt")
+        val espeakData = File(destination, "espeak-ng-data")
+        check(tokens.exists()) { "Не найден tokens.txt" }
+        check(espeakData.isDirectory) { "Не найдены данные espeak-ng" }
+
+        val config = OfflineTtsConfig(
+            model = OfflineTtsModelConfig(
+                vits = OfflineTtsVitsModelConfig(
+                    model = model.absolutePath,
+                    tokens = tokens.absolutePath,
+                    dataDir = espeakData.absolutePath
+                ),
+                numThreads = 2
+            )
+        )
+        offlineTts = OfflineTts(config = config)
+    }
+
+    private fun copyAssetTree(assetPath: String, destination: File) {
+        val children = assets.list(assetPath) ?: emptyArray()
+        if (children.isEmpty()) {
+            destination.parentFile?.mkdirs()
+            assets.open(assetPath).use { input ->
+                FileOutputStream(destination).use { output -> input.copyTo(output) }
+            }
+        } else {
+            destination.mkdirs()
+            children.forEach { child -> copyAssetTree("$assetPath/$child", File(destination, child)) }
         }
     }
 
@@ -151,7 +208,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 speak("Открываю набор номера. Проверь номер и подтверди вызов.")
                 startActivity(Intent(Intent.ACTION_DIAL))
             }
-            phrase.contains("привет") || phrase.contains("джарвис") -> speak("На связи. Работаю в пределах возможностей устройства.")
+            phrase.contains("привет") || phrase.contains("джарвис") -> speak("На связи. Голос работает локально.")
             else -> speak("Эта команда пока не добавлена в локальный список.")
         }
     }
@@ -169,25 +226,49 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun speak(text: String) {
         status.text = text
-        if (ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-" + System.nanoTime())
-    }
-
-    override fun onInit(statusCode: Int) {
-        ttsReady = statusCode == TextToSpeech.SUCCESS
-        if (ttsReady) {
-            val result = tts?.setLanguage(Locale("ru", "RU"))
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                status.text = "Русский голос TTS не установлен на устройстве."
-            }
-        } else {
-            status.text = "Системный TTS не запустился."
+        if (!voiceReady) {
+            status.text = "Голосовая модель ещё загружается."
+            return
         }
+        Thread {
+            runCatching {
+                val audio = offlineTts!!.generate(text = text, sid = 0, speed = 1.0f)
+                val track = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(audio.sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(16384)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+                track.play()
+                var offset = 0
+                while (offset < audio.samples.size) {
+                    val count = minOf(4096, audio.samples.size - offset)
+                    track.write(audio.samples, offset, count, AudioTrack.WRITE_BLOCKING)
+                    offset += count
+                }
+                track.stop()
+                track.release()
+            }.onFailure { error ->
+                runOnUiThread { status.text = "Ошибка синтеза голоса: ${error.message}" }
+            }
+        }.start()
     }
 
     override fun onDestroy() {
         recognizer?.destroy()
-        tts?.stop()
-        tts?.shutdown()
+        offlineTts?.release()
+        offlineTts = null
         super.onDestroy()
     }
 }
