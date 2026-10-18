@@ -23,6 +23,7 @@ import java.util.Locale
 class WakeWordService : Service() {
     private var recognizer: SpeechRecognizer? = null
     @Volatile private var running = false
+    @Volatile private var directCommandMode = false
     private var restarting = false
 
     override fun onCreate() {
@@ -43,6 +44,8 @@ class WakeWordService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        directCommandMode = intent?.action == ACTION_DIRECT
+        updateNotification(if (directCommandMode) "Скажи команду сейчас" else "Ожидаю слово «Джарвис»")
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             updateNotification("На устройстве нет распознавания речи")
             stopSelf()
@@ -88,7 +91,7 @@ class WakeWordService : Service() {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ru-RU")
-                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 }
@@ -103,23 +106,35 @@ class WakeWordService : Service() {
 
     private fun processPhrase(phrase: String) {
         if (phrase.isBlank()) return
-        val wakeIndex = phrase.indexOf("джарвис")
-        if (wakeIndex < 0) return
-        val command = phrase.substring(wakeIndex + "джарвис".length).trim()
-        if (command.isBlank()) {
-            updateNotification("Слово услышано. Скажите команду")
+        if (directCommandMode) {
+            directCommandMode = false
+            executeCommand(phrase)
             return
         }
+        val wakeWords = listOf("джарвис", "джарвес", "жарвис", "jarvis")
+        val wake = wakeWords.map { it to phrase.indexOf(it) }.filter { it.second >= 0 }.minByOrNull { it.second }
+            ?: return
+        val command = phrase.substring(wake.second + wake.first.length).trim()
+        if (command.isBlank()) {
+            updateNotification("Слово услышано. Скажи команду после слова «Джарвис»")
+            return
+        }
+        executeCommand(command)
+    }
+
+    private fun executeCommand(command: String) {
         when {
-            command.contains("камер") || command.contains("фото") ->
+            command.contains("камер") || command.contains("фото") || command.contains("сфот") ->
                 openApp(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
-            command.contains("музык") || command.contains("песн") ->
+            command.contains("музык") || command.contains("песн") || command.contains("трек") || command.contains("плеер") ->
                 openApp(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC))
-            command.contains("позвони") || command.contains("набери") || command.contains("вызов") -> {
-                updateNotification("Откройте телефон и подтвердите вызов")
+            command.contains("позвони") || command.contains("набери") || command.contains("вызов") || command.contains("телефон") -> {
+                updateNotification("Открыл набор номера. Проверь номер и подтверди вызов")
                 openApp(Intent(Intent.ACTION_DIAL))
             }
-            else -> updateNotification("Услышал: $command")
+            command.contains("стоп") || command.contains("останови") ->
+                updateNotification("Для остановки нажми «Выключить» в уведомлении")
+            else -> updateNotification("Услышал: $command. Пока поддерживаются камера, музыка и набор номера")
         }
     }
 
@@ -187,6 +202,7 @@ class WakeWordService : Service() {
 
     companion object {
         const val ACTION_START = "ai.jarvis.offline.START_WAKE_LISTENING"
+        const val ACTION_DIRECT = "ai.jarvis.offline.START_DIRECT_COMMAND"
         const val ACTION_STOP = "ai.jarvis.offline.STOP_WAKE_LISTENING"
         private const val CHANNEL_ID = "jarvis_voice_control"
         private const val NOTIFICATION_ID = 7104
