@@ -104,7 +104,7 @@ class FloatingVoiceService : Service() {
     private fun toggleVoice() {
         val intent = Intent(this, WakeWordService::class.java)
         if (!listening) {
-            intent.action = WakeWordService.ACTION_START
+            intent.action = WakeWordService.ACTION_DIRECT
             try {
                 if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
                 listening = true
