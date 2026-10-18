@@ -31,6 +31,12 @@ import java.io.FileOutputStream
 import java.util.Locale
 
 class MainActivity : Activity() {
+    companion object {
+        @Volatile var externalVoiceLevelListener: ((Float) -> Unit)? = null
+        fun reportExternalVoiceLevel(level: Float) {
+            externalVoiceLevelListener?.invoke(level)
+        }
+    }
     private var offlineTts: OfflineTts? = null
     private var recognizer: SpeechRecognizer? = null
     private lateinit var status: TextView
@@ -578,7 +584,18 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    override fun onResume() {
+        super.onResume()
+        externalVoiceLevelListener = { level -> setOrbLevel(level) }
+    }
+
+    override fun onPause() {
+        externalVoiceLevelListener = null
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        externalVoiceLevelListener = null
         recognizer?.destroy()
         offlineTts?.release()
         offlineTts = null
