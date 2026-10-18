@@ -32,6 +32,14 @@
             </intent-filter>
         </activity>
         <service
+            android:name=".FloatingVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Плавающая кнопка голосового режима Jarvis" />
+        </service>
+        <service
             android:name=".WakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
