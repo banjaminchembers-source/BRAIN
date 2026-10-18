@@ -217,10 +217,30 @@ class MainActivity : Activity() {
             }
             elevation = dp(5).toFloat()
             stateListAnimator = null
+            contentDescription = "Настройки Jarvis и разрешения Android"
             setOnClickListener {
-                runCatching {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-                }.onFailure { status.text = "Не удалось открыть системные настройки." }
+                val items = arrayOf(
+                    "Разрешения приложения",
+                    "Плавающая кнопка поверх приложений",
+                    "Распознавание речи",
+                    "Уведомления Jarvis",
+                    "Оптимизация батареи"
+                )
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Настройки Jarvis")
+                    .setItems(items) { _, which ->
+                        val intent = when (which) {
+                            0 -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                            1 -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                            2 -> Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+                            3 -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                            else -> Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        }
+                        runCatching { startActivity(intent) }
+                            .onFailure { status.text = "Эта страница настроек недоступна на данном устройстве." }
+                    }
+                    .setNegativeButton("Закрыть", null)
+                    .show()
             }
         }
         val redIndicator = TextView(this).apply {
@@ -497,7 +517,7 @@ class MainActivity : Activity() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
@@ -587,6 +607,16 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         externalVoiceLevelListener = { level -> setOrbLevel(level) }
+        if (waitingForOverlayPermission && Settings.canDrawOverlays(this)) {
+            waitingForOverlayPermission = false
+            val serviceIntent = Intent(this, FloatingVoiceService::class.java)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent) else startService(serviceIntent)
+                status.text = "Разрешение получено. Плавающая кнопка включена."
+            } catch (e: Exception) {
+                status.text = "Не удалось включить плавающую кнопку: ${e.message}"
+            }
+        }
     }
 
     override fun onPause() {
