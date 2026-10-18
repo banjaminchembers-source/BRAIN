@@ -11,6 +11,9 @@ android {
         applicationId = "ai.jarvis.offline"
         minSdk = 26
         targetSdk = 35
+        versionCode = 2
+        versionName = "0.2.0"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -19,9 +22,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-    }
-        versionCode = 1
-        versionName = "0.1.0"
     }
 }
 
