@@ -18,6 +18,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -243,13 +244,13 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(22), 0, dp(16))
         }
-        val outer = TextView(this).apply {
-            gravity = Gravity.CENTER
+        val outer = FrameLayout(this).apply {
+            foregroundGravity = Gravity.CENTER
             background = glossyCircle(0xFF0C1308.toInt(), 0xFF4B7028.toInt(), 0xFF17240D.toInt())
             elevation = dp(10).toFloat()
         }
-        val middle = TextView(this).apply {
-            gravity = Gravity.CENTER
+        val middle = FrameLayout(this).apply {
+            foregroundGravity = Gravity.CENTER
             background = glossyCircle(0xFF18260C.toInt(), 0xFF9FE83B.toInt(), 0xFF263D12.toInt())
         }
         val core = LinearLayout(this).apply {
