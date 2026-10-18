@@ -122,50 +122,122 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
+        window.statusBarColor = 0xFF050509.toInt()
+        window.navigationBarColor = 0xFF050509.toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(28, 32, 28, 28)
-            setBackgroundColor(0xFF10151D.toInt())
+            setPadding(24, 26, 24, 24)
+            setBackgroundColor(0xFF050509.toInt())
         }
         val scroll = ScrollView(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
+            setPadding(0, 16, 0, 16)
+        }
+        val eyebrow = TextView(this).apply {
+            text = "PERSONAL AI  /  OFFLINE VOICE"
+            textSize = 11f
+            letterSpacing = 0.18f
+            setTextColor(0xFF00F5FF.toInt())
+            gravity = Gravity.CENTER
         }
         val title = TextView(this).apply {
-            text = "JARVIS"
-            textSize = 30f
-            setTextColor(0xFFEAF2FF.toInt())
+            text = "J A R V I S"
+            textSize = 32f
+            typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+            setTextColor(0xFF00F5FF.toInt())
             gravity = Gravity.CENTER
+            setShadowLayer(18f, 0f, 0f, 0xFF00D9FF.toInt())
+            setPadding(0, 12, 0, 4)
+        }
+        val subtitle = TextView(this).apply {
+            text = "ГОЛОСОВОЙ ИНТЕРФЕЙС"
+            textSize = 11f
+            letterSpacing = 0.24f
+            setTextColor(0xFFB44CFF.toInt())
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 22)
         }
         status = TextView(this).apply {
-            textSize = 16f
-            setTextColor(0xFFB9C7D9.toInt())
+            text = "Подготавливаю голосовую систему…"
+            textSize = 15f
+            setTextColor(0xFFD7D9E8.toInt())
             gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 24)
+            setPadding(16, 20, 16, 20)
+            background = roundedPanel(0xFF0D101B.toInt(), 0xFF263A58.toInt(), 18)
         }
-        listenButton = Button(this).apply {
-            text = "Голосовой диалог"
-            textSize = 18f
+        listenButton = neonButton("◉   ГОЛОСОВОЙ ДИАЛОГ", 0xFF00F5FF.toInt(), 0xFF061116.toInt()).apply {
             setOnClickListener { startListening() }
         }
-        val camera = Button(this).apply {
-            text = "Открыть камеру"
+        val backgroundButton = neonButton("⌁   ФОНОВОЕ ПРОСЛУШИВАНИЕ", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
+            setOnClickListener { startWakeListening() }
+        }
+        val camera = neonButton("КАМЕРА", 0xFF00F5FF.toInt(), 0xFF061116.toInt()).apply {
             setOnClickListener { launchCamera() }
         }
-        val music = Button(this).apply {
-            text = "Открыть музыку"
+        val music = neonButton("МУЗЫКА", 0xFFB44CFF.toInt(), 0xFF12091A.toInt()).apply {
             setOnClickListener { launchMusic() }
         }
+        val hint = TextView(this).apply {
+            text = "Скажи «Джарвис» и команду. Для фонового режима приложение покажет постоянное уведомление."
+            textSize = 12f
+            setTextColor(0xFF858AA4.toInt())
+            gravity = Gravity.CENTER
+            setPadding(12, 18, 12, 6)
+        }
+        content.addView(eyebrow, matchWidth())
         content.addView(title, matchWidth())
+        content.addView(subtitle, matchWidth())
         content.addView(status, matchWidth())
         content.addView(listenButton, matchWidth())
+        content.addView(backgroundButton, matchWidth())
         content.addView(camera, matchWidth())
         content.addView(music, matchWidth())
+        content.addView(hint, matchWidth())
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
+    }
+
+    private fun roundedPanel(color: Int, stroke: Int, radiusDp: Int) =
+        android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radiusDp * resources.displayMetrics.density
+            setStroke((1.2f * resources.displayMetrics.density).toInt(), stroke)
+        }
+
+    private fun neonButton(label: String, neon: Int, fill: Int) = Button(this).apply {
+        text = label
+        textSize = 13f
+        letterSpacing = 0.04f
+        isAllCaps = false
+        setTextColor(neon)
+        background = roundedPanel(fill, neon, 48)
+        elevation = 0f
+        setPadding(18, 18, 18, 18)
+        minHeight = (58 * resources.displayMetrics.density).toInt()
+        stateListAnimator = null
+    }
+
+    private fun startWakeListening() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 42)
+            status.text = "Разреши доступ к микрофону, затем включи фоновое прослушивание."
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 43)
+        }
+        try {
+            val serviceIntent = Intent(this, WakeWordService::class.java).setAction(WakeWordService.ACTION_START)
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent) else startService(serviceIntent)
+            status.text = "Фоновое прослушивание запущено. Скажи «Джарвис»."
+        } catch (e: Exception) {
+            status.text = "Не удалось запустить фоновый микрофон: ${e.message}"
+        }
     }
 
     private fun matchWidth() = LinearLayout.LayoutParams(
