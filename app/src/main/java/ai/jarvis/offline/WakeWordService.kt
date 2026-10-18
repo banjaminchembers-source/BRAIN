@@ -196,13 +196,22 @@ class WakeWordService : Service() {
                 track.play()
                 var offset = 0
                 while (offset < audio.samples.size) {
-                    val count = minOf(4096, audio.samples.size - offset)
+                    val count = minOf(1024, audio.samples.size - offset)
+                    var sumSquares = 0.0
+                    for (i in offset until minOf(offset + count, audio.samples.size)) {
+                        val sample = audio.samples[i].toDouble()
+                        sumSquares += sample * sample
+                    }
+                    val rms = kotlin.math.sqrt(sumSquares / count.coerceAtLeast(1)).toFloat()
+                    MainActivity.reportExternalVoiceLevel((rms * 0.55f).coerceIn(0f, 0.14f))
                     track.write(audio.samples, offset, count, AudioTrack.WRITE_BLOCKING)
                     offset += count
                 }
                 track.stop()
                 track.release()
+                MainActivity.reportExternalVoiceLevel(0f)
             } catch (e: Exception) {
+                MainActivity.reportExternalVoiceLevel(0f)
                 Log.e(TAG, "Could not speak wake response", e)
                 updateNotification("Услышал «Джарвис», но не удалось произнести ответ")
             } finally {
