@@ -216,7 +216,6 @@ class MainActivity : Activity() {
                 }.onFailure { status.text = "Не удалось открыть системные настройки." }
             }
         }
-        header.addView(gear, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) })
         val redIndicator = TextView(this).apply {
             text = "●"
             textSize = 13f
@@ -226,6 +225,7 @@ class MainActivity : Activity() {
             contentDescription = "Индикатор"
         }
         header.addView(redIndicator, LinearLayout.LayoutParams(dp(18), dp(24)).apply { marginStart = dp(3) })
+        header.addView(gear, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(3) })
         content.addView(header, matchWidth())
 
         val topLine = TextView(this).apply {
